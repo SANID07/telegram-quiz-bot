@@ -1,0 +1,108 @@
+Bot.py
+
+
+import asyncio
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+
+TOKEN = "8621282238:AAHyKA2qXSdfXpPJsLk-kDOcpo27ZZOwt7A"
+ADMIN_ID = 1249170269
+
+bot = Bot(
+    token=TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
+
+dp = Dispatcher()
+
+quiz_active = False
+answers = {}
+correct_answer = "B"
+
+
+@dp.message(Command("start"))
+async def start(message: types.Message):
+    await message.answer(
+        "🤖 Quiz Bot Ready!\nUse /quiz"
+    )
+
+
+@dp.message(Command("quiz"))
+async def quiz(message: types.Message):
+    global quiz_active, answers
+
+    if quiz_active:
+        await message.answer("Quiz already running!")
+        return
+
+    quiz_active = True
+    answers = {}
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="A", callback_data="A"),
+                InlineKeyboardButton(text="B", callback_data="B")
+            ],
+            [
+                InlineKeyboardButton(text="C", callback_data="C"),
+                InlineKeyboardButton(text="D", callback_data="D")
+            ]
+        ]
+    )
+
+    await message.answer(
+        "⏳ 10 Seconds!\n\nWhat is 5 + 5?",
+        reply_markup=keyboard
+    )
+
+    await asyncio.sleep(10)
+
+    quiz_active = False
+
+    winners = []
+
+    for uid, ans in answers.items():
+        if ans == correct_answer:
+            winners.append(uid)
+
+    await message.answer(
+        f"⏰ Time Up!\n\n✅ Correct Answer: {correct_answer}\n🏆 Winners: {len(winners)}"
+    )
+
+
+@dp.callback_query()
+async def handle_answer(callback: types.CallbackQuery):
+    global answers
+
+    if not quiz_active:
+        await callback.answer("Quiz ended!")
+        return
+
+    user = callback.from_user
+
+    if user.id in answers:
+        await callback.answer("Already answered!")
+        return
+
+    answer = callback.data
+    answers[user.id] = answer
+
+    # only admin sees this
+    await bot.send_message(
+        ADMIN_ID,
+        f"👤 {user.full_name} selected {answer}"
+    )
+
+    await callback.answer("✅ Submitted!")
+
+
+async def main():
+    print("Bot running...")
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
